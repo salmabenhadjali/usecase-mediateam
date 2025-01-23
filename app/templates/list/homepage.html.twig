@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}
+	{{ parent() }}
+{% endblock %}
+
+{% block body %}
+	<div class="container">
+		<div
+			class="row mt-5">
+			<!-- First Part -->
+			<div class="col-6 col-md-6 ps-6" data-controller="todolist-controls">
+				<h2 class="mb-4">{{ items|length }}
+					Todo List(s)</h2>
+				{% for item in items %}
+					<div class="list">
+						<div class="d-flex mb-3">
+							<a href="#" class="btn btn-primary me-3" data-action="click->todolist-controls#loadItems" data-todolist-controls-url={{ path('api_todolists_get', {id: item.id} ) }}>
+								<i class="fas fa-play"></i>
+							</a>
+							<span class="details me-3">{{ item.title }}</span>
+							<a href="#" class="btn btn-danger">
+								<i class="fas fa-times"></i>
+							</a>
+						</div>
+					</div>
+				{% endfor %}
+				<button type="button" class="btn btn-success">
+					<i class="fas fa-plus"></i>
+					Add a new TodoList
+				</button>
+			</div>
+
+			<!-- Second Part -->
+			<div class="col-6 col-md-6 ps-6" data-controller="item-controls">
+				<div id="dynamic-content">Select an item to view details.</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}
