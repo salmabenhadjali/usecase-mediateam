@@ -4,59 +4,85 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\TodoList;
 use Psr\Log\LoggerInterface;
+use App\Repository\TodoListRepository;
+use DateTimeImmutable;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class TodoListAPIController extends AbstractController
 {
-    #[Route('/api/todolists', methods: ['GET'], name: 'api_todolists_get_all')]
-    public function getAll(LoggerInterface $logger): Response
+    private LoggerInterface $logger;
+
+    public function __construct(LoggerInterface $logger)
     {
-        $logger->info("Fetching all TodoLists");
-        //TODO query to the database to get all Todo Lists
+        $this->logger = $logger;
+    }
 
-        $$todolists = [];
+    #[Route('/api/todolists', methods: ['GET'], name: 'api_todolists_get_all')]
+    public function getAll(TodoListRepository $todoListRepository): Response
+    {
+        $this->logger->info("Fetching all TodoLists");
+        // fetch all Todolists
+        $todolists = $todoListRepository->findAll();
 
-        return $this->json($todolists);
+        return $this->json($todolists, Response::HTTP_OK, [], ['groups' => 'todo_list']);
     }
 
     #[Route('/api/todolists/{id<\d+>}', methods: ['GET'], name: 'api_todolists_get')]
-    public function getItemsByList(int $id, LoggerInterface $logger): Response
+    public function getItemsByList(int $id, TodoListRepository $todoListRepository): Response
     {
-        $logger->info("Fetching TodoList with ID: {id}", [
-            'id' => $id,
+        $this->logger->info("Fetching TodoList with ID {id}", [
+            'id' => $id
         ]);
 
-        //TODO query the database
+        /* @var TodoList $todoList */
+        $todoList = $todoListRepository->find($id);
 
-        $items = [
-            ['title' => 'item 1', 'subItems' => ['sub item 11']],
-            ['title' => 'item 2', 'subItems' => ['sub item 21']],
-            ['title' => 'item 3', 'subItems' => ['sub item 31', 'sub item 32', 'sub item 32']],
-            ['title' => 'item 5', 'subItems' => ['sub item 51', 'sub item 52']],
-            ['title' => 'item 6', 'subItems' => []]
-        ];
+        if (!$todoList) {
+            $this->logger->error("TodoList with ID {id} not found", [
+                'id' => $id
+            ]);
+            return $this->json(['message' => 'TodoList not found'], Response::HTTP_NOT_FOUND);
+        }
 
         return $this->render('item/details.html.twig', [
-            'items' => $items,
-            'title' => 'List Name'
+            'items' => $todoList->getItems(),
+            'name' => $todoList->getName(),
         ]);
     }
 
     #[Route('/api/todolists', methods: ['POST'], name: 'api_todolists_create')]
-    public function create(int $id, LoggerInterface $logger): Response
+    public function create(Request $request, EntityManagerInterface $entityManager): Response
     {
-        //TODO query to the database to create the current Todo List
+        $data = json_decode($request->getContent(), true);
 
-        $todolist = [];
-        $logger->info("TodoList created with ID {id}", [
-            'id' => $id,
+        if (!$data || !isset($data['name'])) {
+            $this->logger->error('Invalid data for creating a TodoList');
+            return $this->json(['message' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
+        };
+
+        $todolist = new TodoList();
+        $todolist->setName($data['name']);
+        $now = new DateTimeImmutable();
+        $todolist->setCreatedAt($now);
+        $todolist->setUpdatedAt($now);
+
+        $entityManager->persist($todolist);
+        $entityManager->flush();
+
+        $this->logger->info('Todolist cretaed with ID {id}', [
+            'id' => $todolist->getId(),
         ]);
 
-        return $this->json($todolist);
+        return $this->json([
+            'id' => $todolist->getId(),
+            'message' => 'Todolost created successfully',
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/api/todolists/{id<\d+>}', methods: ['PUT'], name: 'api_todolists_update')]
